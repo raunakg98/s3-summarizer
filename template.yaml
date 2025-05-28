@@ -6,7 +6,7 @@ Globals:
   Function:
     Runtime: python3.12
     MemorySize: 1024
-    Timeout: 30
+    Timeout: 60
     Environment:
       Variables:
         MODEL_ID: amazon.titan-text-lite-v1

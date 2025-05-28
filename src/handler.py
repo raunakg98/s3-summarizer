@@ -31,6 +31,13 @@ def summarise(text: str, model: str) -> str:
     bullets = [_summarise_chunk(c, model) for c in chunks]
     return _summarise_chunk(" ".join(bullets), model)
 
+# ---------- helper to add CORS headers -----------------------------
+def _cors(resp: dict) -> dict:
+    resp.setdefault("headers", {})
+    resp["headers"]["Access-Control-Allow-Origin"]  = "*"
+    resp["headers"]["Access-Control-Allow-Headers"] = "*"
+    return resp
+
 # ── Lambda entrypoint -------------------------------------------
 def lambda_handler(event, _):
     model_key = json.loads(event.get("body") or "{}").get("model") if "body" in event else event.get("model")
