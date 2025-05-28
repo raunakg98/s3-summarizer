@@ -42,8 +42,9 @@
       <div class="mb-3">
         <label for="modelSelect" class="form-label">Model</label>
         <select id="modelSelect" class="form-select">
-          <option value="titan" selected>Amazon Titan Text Lite</option>
-          <option value="haiku">Claude 3.5 Haiku (default)</option>
+          <option value="titan" selected>Amazon Titan Text Lite (default)</option>
+          <option value="cohere-light">Cohere Command-Light</option>
+          <option value="haiku">Claude 3 Haiku (2024)</option>
         </select>
       </div>
 
@@ -70,24 +71,52 @@
 
     <hr class="my-5" />
 
-    <!-- ── ABOUT ────────────────────────────────────────── -->
-    <section>
-      <h2>About this demo</h2>
-      <p>
-        This app lets you upload a `.txt` file and returns exactly five bullet points summarising the content.
-        It uses a serverless Python API with <strong>AWS Lambda + Amazon Bedrock</strong>.
-      </p>
-      <ul>
-        <li><strong>Fast + lightweight</strong> serverless architecture (SAM, Lambda, S3).</li>
-        <li><strong>Two LLM options</strong>: Claude 3.5 Haiku (fast/cheap) and Titan (backup).</li>
-        <li><strong>Chunking</strong> handles long texts within model limits.</li>
-        <li><strong>Limitations:</strong> plain text only&nbsp;• cost charged to your Bedrock account.</li>
-      </ul>
-      <p class="small text-muted mb-0">
-        View source on <a href="https://github.com/raunakg98/s3-summarizer" target="_blank">GitHub</a>.
-      </p>
-    </section>
-  </div>
+<!-- ── ABOUT ────────────────────────────────────────── -->
+<section>
+  <h2>About this demo</h2>
+
+  <p>
+    Drop a plain-text file and get <strong>exactly five</strong> bullet-point
+    takeaways in a few seconds. Everything runs on a <em>fully serverless</em>
+    stack—there are <u>no</u> EC2 instances to patch or keep warm.
+  </p>
+
+  <ul>
+    <li><strong>AWS Lambda</strong> – one Python function that calls the LLM and writes results to S3.</li>
+    <li><strong>Amazon API Gateway&nbsp;(HTTP API)</strong> – HTTPS endpoint the browser hits.</li>
+    <li><strong>Amazon Bedrock</strong> – choose the model on the fly:
+      Titan-Lite (default), Cohere&nbsp;Command-Light, or Claude&nbsp;3&nbsp;Haiku.</li>
+    <li><strong>Amazon S3</strong> – stores your original file under <code>raw/</code>
+        and the summary under <code>summary/</code>.</li>
+    <li><strong>AWS SAM</strong> – one template deploys the whole lot.</li>
+  </ul>
+
+  <h6 class="mt-3 mb-1">What it’s good for</h6>
+  <ul>
+    <li>Quick content previews before you dive into a long article.</li>
+    <li>Batch-summarising many files by pushing them to the <code>raw/</code> folder.</li>
+    <li>Plug-and-play demo of how to wire Bedrock into a serverless workflow.</li>
+  </ul>
+
+  <h6 class="mt-3 mb-1">Current limitations</h6>
+  <ul>
+    <li>Text only (&lt;200&nbsp;KB per file). No PDFs or HTML yet.</li>
+    <li>One language at a time—auto-detect works but bullets come back in English.</li>
+    <li>Your Bedrock account is billed for tokens; Haiku costs more than Titan/Cohere.</li>
+  </ul>
+
+  <p class="mt-3">
+    <strong>Future potential:</strong> swap in larger models, extend to PDFs via Textract,
+    or trigger downstream workflows (Slack alerts, vector search, etc.).
+  </p>
+
+  <p class="small text-muted mb-0">
+    Source code on <a href="https://github.com/raunakg98/s3-summarizer" target="_blank">GitHub</a>.
+  </p>
+</section>
+
+
+
 
   <!-- ── SCRIPT ─────────────────────────────────────────── -->
   <script>

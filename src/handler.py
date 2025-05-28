@@ -10,26 +10,84 @@ DEFAULT_MODELID = os.environ.get("MODEL_ID", "amazon.titan-text-lite-v1")
 # ── model mapping ─────────────────────────────────────────────
 MODELS = {
     "titan": "amazon.titan-text-lite-v1",
-    "haiku": "anthropic.claude-3-5-haiku-20241022-v1:0"
+    "haiku": "anthropic.claude-3-haiku-20240307-v1:0",
+    "cohere-light": "cohere.command-light-text-v14"
 }
 
 # ── Bedrock helper ────────────────────────────────────────────
-def _invoke_bedrock(prompt: str, model_id: str) -> str:
-    body = json.dumps({
-        "inputText": prompt,
-        "textGenerationConfig": {"maxTokenCount": 256, "temperature": 0.2}
-    })
-    resp = bedrock.invoke_model(modelId=model_id, body=body)
-    return json.loads(resp["body"].read())["results"][0]["outputText"]
+# def _invoke_bedrock(prompt: str, model_id: str) -> str:
+#     body = json.dumps({
+#         "inputText": prompt,
+#         "textGenerationConfig": {"maxTokenCount": 256, "temperature": 0.2}
+#     })
+#     resp = bedrock.invoke_model(modelId=model_id, body=body)
+#     return json.loads(resp["body"].read())["results"][0]["outputText"]
+
+def _invoke_bedrock(payload, model_id: str) -> str:
+    if model_id.startswith("anthropic."):
+        system_msg = payload["system"]
+        user_msg   = payload["user"]
+        body = json.dumps({
+            "anthropic_version": "bedrock-2023-05-31",
+            "system": system_msg,
+            "messages": [{"role": "user", "content": user_msg}],
+            "max_tokens": 256,
+            "temperature": 0.2
+        })
+    elif model_id.startswith("cohere."):
+        body = json.dumps({
+            "prompt": payload,          # payload is a string here
+            "max_tokens": 256,
+            "temperature": 0.2,
+            "stop_sequences": []
+        })
+    else:  # Titan / others
+        body = json.dumps({
+            "inputText": payload,
+            "textGenerationConfig": {
+                "maxTokenCount": 256,
+                "temperature": 0.2
+            }
+        })
+
+    resp  = bedrock.invoke_model(modelId=model_id, body=body)
+    data  = json.loads(resp["body"].read())
+
+    if model_id.startswith("anthropic."):
+        return data["content"][0]["text"]
+    elif model_id.startswith("cohere."):
+        return data["generations"][0]["text"]
+    else:
+        return data["results"][0]["outputText"]
+
+
+# def _summarise_chunk(text: str, model: str) -> str:
+#     prompt = (
+#         "You are a helpful assistant.\n"
+#         "Summarise the following passage in short, clear bullet points.\n"
+#         "Return **exactly five** concise bullets.\n\n"
+#         f"{text}"
+#     )
+#     return _invoke_bedrock(prompt, model)
 
 def _summarise_chunk(text: str, model: str) -> str:
-    prompt = (
-        "You are a helpful assistant.\n"
-        "Summarise the following passage in short, clear bullet points.\n"
-        "Return **exactly five** concise bullets.\n\n"
-        f"{text}"
-    )
-    return _invoke_bedrock(prompt, model)
+    if model.startswith("anthropic."):        # Claude path → use (system, user)
+        return _invoke_bedrock(
+            {
+                "system": (
+                    "You are a helpful assistant. Summarise the user-provided "
+                    "passage in **exactly five** short, clear bullet points."
+                ),
+                "user": text
+            },
+            model
+        )
+    else:                                     # Titan / Cohere keep old prompt
+        prompt = (
+            "Summarise the following passage in five concise bullet points.\n\n"
+            f"{text}"
+        )
+        return _invoke_bedrock(prompt, model)
 
 def summarise(text: str, model_id: str) -> str:
     chunks  = [text[i:i+4800] for i in range(0, len(text), 4800)][:4]
