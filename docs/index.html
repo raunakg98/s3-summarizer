@@ -43,6 +43,18 @@
       padding: 1rem;
       color: #aaa;
     }
+    button {
+      margin-top: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: #2d3748;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1a202c;
+    }
   </style>
 </head>
 <body>
@@ -59,6 +71,13 @@
         <li>The file is read and summarized using Titan on Bedrock</li>
         <li>A summary is saved to the <code>summary/</code> folder in the same bucket</li>
       </ul>
+    </section>
+
+    <section>
+      <h2>Upload a .txt File</h2>
+      <input type="file" id="textFile" accept=".txt">
+      <button onclick="uploadFile()">Upload</button>
+      <p id="uploadStatus"></p>
     </section>
 
     <section>
@@ -94,5 +113,40 @@
   <footer>
     Created by Raunak Ghawghawe • <a href="https://github.com/raunakghawghawe/s3-summariser" target="_blank">View on GitHub</a>
   </footer>
+
+  <script>
+    async function uploadFile() {
+      const fileInput = document.getElementById('textFile');
+      const status = document.getElementById('uploadStatus');
+
+      if (!fileInput.files.length) {
+        status.innerText = 'Please select a file first.';
+        return;
+      }
+
+      const file = fileInput.files[0];
+      const fileName = 'raw/' + file.name;
+
+      try {
+        const response = await fetch('YOUR_API_TO_GET_PRESIGNED_URL', {
+          method: 'POST',
+          body: JSON.stringify({ fileName }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        const { uploadUrl } = await response.json();
+
+        await fetch(uploadUrl, {
+          method: 'PUT',
+          body: file
+        });
+
+        status.innerText = 'Uploaded successfully!';
+      } catch (err) {
+        console.error(err);
+        status.innerText = 'Upload failed.';
+      }
+    }
+  </script>
 </body>
 </html>
