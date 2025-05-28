@@ -21,7 +21,10 @@ def _invoke_bedrock(prompt: str, model_id: str) -> str:
 
 def _summarise_chunk(text: str, model: str) -> str:
     prompt = (
-        "Summarize the following passage in exactly five short bullet points.\n\n"
+        "You are a helpful assistant.\n"
+        "Summarize the following passage in exactly five short bullet points.\n"
+        "Each point should describe a key event or idea.\n"
+        "Only return five bullets. Do not continue the story.\n\n"
         f"{text}"
     )
     return _invoke_bedrock(prompt, model)
@@ -58,12 +61,12 @@ def lambda_handler(event, _):
     # --- /summarise -----------------
     if event.get("rawPath") == "/summarise":
         url = json.loads(event["body"]).get("url","")
-        text = urllib.request.urlopen(url,timeout=10).read().decode("utf-8","ignore")
+        text = urllib.request.urlopen(url,timeout=60).read().decode("utf-8","ignore")
         return _cors({"statusCode":200,"body":json.dumps({"summary": summarise(text, model_id)})})
 
     # --- CLI direct invoke ----------
     if "text" in event or "url" in event:
-        raw = event.get("text") or urllib.request.urlopen(event["url"],timeout=10).read().decode("utf-8","ignore")
+        raw = event.get("text") or urllib.request.urlopen(event["url"],timeout=60).read().decode("utf-8","ignore")
         return _cors({"statusCode":200,"body":json.dumps({"summary": summarise(raw, model_id)})})
 
     return _cors({"statusCode":404,"body":"Not found"})
