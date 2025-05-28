@@ -89,7 +89,7 @@
       status.textContent = 'Reading file…';
       const text = await file.text();
 
-      status.textContent = 'Generating summary…';
+      status.textContent = 'Generating summary…'; 
       try{
         const res = await fetch(API_URL,{
           method:'POST',
