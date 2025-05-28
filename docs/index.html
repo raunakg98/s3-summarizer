@@ -3,57 +3,57 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Five-Bullet Text Summariser</title>
-
-  <!-- Bootstrap 5 (CSS only) -->
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-  />
+  <title>Text Summariser</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <style>
-    body { padding-top: 3rem; }
-    pre       { white-space: pre-wrap; }
-    .spinner  { display: none; }
-    .show     { display: block !important; }
+    body {
+      padding-top: 3rem;
+    }
+    .spinner {
+      display: none;
+    }
+    .show {
+      display: block !important;
+    }
+    pre {
+      white-space: pre-wrap;
+      background-color: #fff;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 1rem;
+    }
+    .half-box {
+      height: 500px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 
 <body>
-  <div class="container" style="max-width: 720px;">
-    <h1 class="mb-4 text-center">⚡ Five-Bullet Text Summariser</h1>
+  <div class="container" style="max-width: 960px;">
+    <h1 class="mb-4 text-center">⚡ Text Summariser</h1>
 
-    <!-- ── INPUT FORM ─────────────────────────────────────────── -->
+    <!-- ── FORM ──────────────────────────────────────────────── -->
     <form id="summariseForm" class="border rounded p-4 bg-light">
       <p class="mb-3">
-        Upload a <strong>.txt</strong> file <em>or</em> paste a public URL,
-        then choose the model and click&nbsp;<kbd>Summarise</kbd>.
+        Upload a <strong>.txt</strong> file and click&nbsp;<kbd>Summarise</kbd>.
+        Need something to test? <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="downloadSampleText()">📄 Click here to download sample text file</button>
       </p>
 
       <div class="mb-3">
         <label for="fileInput" class="form-label">Text file</label>
-        <input type="file" id="fileInput" class="form-control"
-               accept=".txt,text/plain" />
-      </div>
-
-      <p class="text-center my-2 fw-semibold">— OR —</p>
-
-      <div class="mb-3">
-        <label for="urlInput" class="form-label">URL to a text page / raw file</label>
-        <input type="url" id="urlInput" class="form-control"
-               placeholder="https://example.com/alice.txt" />
+        <input type="file" id="fileInput" class="form-control" accept=".txt,text/plain" />
       </div>
 
       <div class="mb-3">
         <label for="modelSelect" class="form-label">Model</label>
         <select id="modelSelect" class="form-select">
-          <option value="haiku" selected>Claude 3 Haiku (fast & cheap)</option>
-          <option value="titan">Amazon Titan Text Lite (fallback)</option>
+          <option value="titan">Amazon Titan Text Lite</option>
+          <option value="haiku" selected>Claude 3 Haiku (default)</option>
         </select>
       </div>
 
-      <button type="submit" class="btn btn-primary w-100">
-        Summarise&nbsp;→
-      </button>
+      <button type="submit" class="btn btn-primary w-100">Summarise →</button>
     </form>
 
     <!-- ── LOADING ────────────────────────────────────────────── -->
@@ -62,100 +62,91 @@
       <p class="mt-2">Crunching text …</p>
     </div>
 
-    <!-- ── RESULT ─────────────────────────────────────────────── -->
-    <h3 id="resultHeading" class="mt-5 d-none">Summary</h3>
-    <pre id="resultBox" class="bg-white border rounded p-3"></pre>
+    <!-- ── RESULTS ────────────────────────────────────────────── -->
+    <div class="row mt-5 d-none" id="resultSection">
+      <div class="col-md-6">
+        <h5 class="fw-bold">📄 Uploaded Text</h5>
+        <pre id="uploadedText" class="half-box"></pre>
+      </div>
+      <div class="col-md-6">
+        <h5 class="fw-bold">📝 Summary (Bullets)</h5>
+        <pre id="resultBox" class="half-box"></pre>
+      </div>
+    </div>
 
     <hr class="my-5" />
 
-    <!-- ── ABOUT / LIMITATIONS ───────────────────────────────── -->
+    <!-- ── ABOUT ──────────────────────────────────────────────── -->
     <section>
       <h2>About this demo</h2>
       <p>
-        This single-page app sends your input to an AWS Lambda function written
-        in Python&nbsp;3.12. Lambda streams the text through Amazon Bedrock and
-        returns <strong>exactly five bullet points</strong>:
+        This app lets you upload a `.txt` file and returns exactly five bullet points summarizing the content.
+        It uses a serverless Python API with <strong>AWS Lambda + Amazon Bedrock</strong> and supports two models:
+        <strong>Claude 3 Haiku</strong> and <strong>Amazon Titan</strong>.
       </p>
       <ul>
-        <li><strong>Serverless stack</strong> – SAM, S3&nbsp;triggers, and an
-            HTTP API.</li>
-        <li><strong>Two LLMs</strong> – Anthropic Claude 3 Haiku (default) or
-            Amazon Titan Text Lite.</li>
-        <li><strong>Chunking</strong> – up to ~19 KB (≈ 19 k chars) is split and
-            re-summarised so small Lambda CPUs stay happy.</li>
-        <li><strong>Temporary storage</strong> – uploaded files live in the
-            <code>raw/</code> folder of an S3 bucket with a 24 h lifecycle
-            rule.</li>
-        <li><strong>Limitations</strong> – no PDFs/HTML, no embeddings,
-            and inference costs come from <em>your</em> Bedrock account.</li>
+        <li><strong>Fast + lightweight</strong> serverless architecture (SAM, Lambda, S3).</li>
+        <li><strong>Two LLM options</strong>: Claude 3 Haiku (fast/cheap) and Titan (backup).</li>
+        <li><strong>Chunking</strong> used to handle long texts with model-friendly limits.</li>
+        <li><strong>Limitations:</strong> Plain text only, no PDF/HTML. Cost from your Bedrock account.</li>
       </ul>
-      <p class="mb-0 small text-muted">
-        Source code &amp; instructions:
-        <a href="https://github.com/your-username/five-bullet-summariser"
-           target="_blank">GitHub repo</a>.
+      <p class="small text-muted mb-0">
+        View source code on <a href="https://github.com/raunakg98/s3-summarizer" target="_blank">GitHub</a>.
       </p>
     </section>
   </div>
 
-  <!-- ── JAVASCRIPT ───────────────────────────────────────────── -->
+  <!-- ── SCRIPT ──────────────────────────────────────────────── -->
   <script>
-    const API_BASE = "https://wdz6s6z6vi.execute-api.us-east-1.amazonaws.com";          // <-- ⚠️ update this!
-    const fileInput   = document.getElementById("fileInput");
-    const urlInput    = document.getElementById("urlInput");
+    const API_BASE = "https://wdz6s6z6vi.execute-api.us-east-1.amazonaws.com";
+    const fileInput = document.getElementById("fileInput");
     const modelSelect = document.getElementById("modelSelect");
-    const form        = document.getElementById("summariseForm");
-    const loading     = document.getElementById("loading");
-    const resultBox   = document.getElementById("resultBox");
-    const resultHdr   = document.getElementById("resultHeading");
+    const form = document.getElementById("summariseForm");
+    const loading = document.getElementById("loading");
+    const resultBox = document.getElementById("resultBox");
+    const uploadedText = document.getElementById("uploadedText");
+    const resultSection = document.getElementById("resultSection");
 
-    // helper to toggle spinner
     const showSpinner = (show) => {
       loading.classList.toggle("show", show);
     };
 
-    // form handler
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      resultHdr.classList.add("d-none");
       resultBox.textContent = "";
+      uploadedText.textContent = "";
+      resultSection.classList.add("d-none");
 
-      const file   = fileInput.files[0];
-      const urlVal = urlInput.value.trim();
-      if (!file && !urlVal) {
-        alert("Please choose a text file OR provide a URL.");
-        return;
-      }
-      if (file && urlVal) {
-        alert("Pick only one input method, please.");
+      const file = fileInput.files[0];
+      if (!file) {
+        alert("Please choose a .txt file.");
         return;
       }
 
-      // read file into string if provided
-      let endpoint, payload;
-      if (file) {
-        if (file.size > 200_000) {       // ~200 kB hard limit
-          alert("File is too large – please keep it under 200 KB.");
-          return;
-        }
-        const text = await file.text();
-        endpoint = "/summarise-text";
-        payload  = { text, model: modelSelect.value };
-      } else {
-        endpoint = "/summarise";
-        payload  = { url: urlVal, model: modelSelect.value };
+      if (file.size > 200_000) {
+        alert("File is too large – please keep it under 200 KB.");
+        return;
       }
+
+      const text = await file.text();
+      uploadedText.textContent = text;
+
+      const payload = {
+        text: text,
+        model: modelSelect.value
+      };
 
       try {
         showSpinner(true);
-        const res = await fetch(API_BASE + endpoint, {
+        const res = await fetch(API_BASE + "/summarise-text", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(payload)
         });
         if (!res.ok) throw new Error(`API error ${res.status}`);
         const { summary } = await res.json();
         resultBox.textContent = summary;
-        resultHdr.classList.remove("d-none");
+        resultSection.classList.remove("d-none");
       } catch (err) {
         console.error(err);
         alert("Sorry – something went wrong. Check the browser console.");
@@ -163,6 +154,25 @@
         showSpinner(false);
       }
     });
+
+    async function downloadSampleText() {
+      const url = "https://raw.githubusercontent.com/raunakg98/s3-summarizer/main/docs/main/sample_article.txt";
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = "sample_article.txt";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(blobUrl);
+      } catch (err) {
+        alert("Failed to download sample file.");
+        console.error(err);
+      }
+    }
   </script>
 </body>
 </html>

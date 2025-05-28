@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Five-Bullet Text Summariser</title>
+
+  <!-- Bootstrap 5 (CSS only) -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <style>
+    body { padding-top: 3rem; }
+    pre       { white-space: pre-wrap; }
+    .spinner  { display: none; }
+    .show     { display: block !important; }
+  </style>
+</head>
+
+<body>
+  <div class="container" style="max-width: 720px;">
+    <h1 class="mb-4 text-center">⚡ Five-Bullet Text Summariser</h1>
+
+    <!-- ── INPUT FORM ─────────────────────────────────────────── -->
+    <form id="summariseForm" class="border rounded p-4 bg-light">
+      <p class="mb-3">
+        Upload a <strong>.txt</strong> file <em>or</em> paste a public URL,
+        then choose the model and click&nbsp;<kbd>Summarise</kbd>.
+      </p>
+
+      <div class="mb-3">
+        <label for="fileInput" class="form-label">Text file</label>
+        <input type="file" id="fileInput" class="form-control"
+               accept=".txt,text/plain" />
+      </div>
+
+      <p class="text-center my-2 fw-semibold">— OR —</p>
+
+      <div class="mb-3">
+        <label for="urlInput" class="form-label">URL to a text page / raw file</label>
+        <input type="url" id="urlInput" class="form-control"
+               placeholder="https://example.com/alice.txt" />
+      </div>
+
+      <div class="mb-3">
+        <label for="modelSelect" class="form-label">Model</label>
+        <select id="modelSelect" class="form-select">
+          <option value="haiku" selected>Claude 3 Haiku (fast & cheap)</option>
+          <option value="titan">Amazon Titan Text Lite (fallback)</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100">
+        Summarise&nbsp;→
+      </button>
+    </form>
+
+    <!-- ── LOADING ────────────────────────────────────────────── -->
+    <div id="loading" class="text-center mt-4 spinner">
+      <div class="spinner-border" role="status" aria-hidden="true"></div>
+      <p class="mt-2">Crunching text …</p>
+    </div>
+
+    <!-- ── RESULT ─────────────────────────────────────────────── -->
+    <h3 id="resultHeading" class="mt-5 d-none">Summary</h3>
+    <pre id="resultBox" class="bg-white border rounded p-3"></pre>
+
+    <hr class="my-5" />
+
+    <!-- ── ABOUT / LIMITATIONS ───────────────────────────────── -->
+    <section>
+      <h2>About this demo</h2>
+      <p>
+        This single-page app sends your input to an AWS Lambda function written
+        in Python&nbsp;3.12. Lambda streams the text through Amazon Bedrock and
+        returns <strong>exactly five bullet points</strong>:
+      </p>
+      <ul>
+        <li><strong>Serverless stack</strong> – SAM, S3&nbsp;triggers, and an
+            HTTP API.</li>
+        <li><strong>Two LLMs</strong> – Anthropic Claude 3 Haiku (default) or
+            Amazon Titan Text Lite.</li>
+        <li><strong>Chunking</strong> – up to ~19 KB (≈ 19 k chars) is split and
+            re-summarised so small Lambda CPUs stay happy.</li>
+        <li><strong>Temporary storage</strong> – uploaded files live in the
+            <code>raw/</code> folder of an S3 bucket with a 24 h lifecycle
+            rule.</li>
+        <li><strong>Limitations</strong> – no PDFs/HTML, no embeddings,
+            and inference costs come from <em>your</em> Bedrock account.</li>
+      </ul>
+      <p class="mb-0 small text-muted">
+        Source code &amp; instructions:
+        <a href="https://github.com/your-username/five-bullet-summariser"
+           target="_blank">GitHub repo</a>.
+      </p>
+    </section>
+  </div>
+
+  <!-- ── JAVASCRIPT ───────────────────────────────────────────── -->
+  <script>
+    const API_BASE = "https://wdz6s6z6vi.execute-api.us-east-1.amazonaws.com";          // <-- ⚠️ update this!
+    const fileInput   = document.getElementById("fileInput");
+    const urlInput    = document.getElementById("urlInput");
+    const modelSelect = document.getElementById("modelSelect");
+    const form        = document.getElementById("summariseForm");
+    const loading     = document.getElementById("loading");
+    const resultBox   = document.getElementById("resultBox");
+    const resultHdr   = document.getElementById("resultHeading");
+
+    // helper to toggle spinner
+    const showSpinner = (show) => {
+      loading.classList.toggle("show", show);
+    };
+
+    // form handler
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      resultHdr.classList.add("d-none");
+      resultBox.textContent = "";
+
+      const file   = fileInput.files[0];
+      const urlVal = urlInput.value.trim();
+      if (!file && !urlVal) {
+        alert("Please choose a text file OR provide a URL.");
+        return;
+      }
+      if (file && urlVal) {
+        alert("Pick only one input method, please.");
+        return;
+      }
+
+      // read file into string if provided
+      let endpoint, payload;
+      if (file) {
+        if (file.size > 200_000) {       // ~200 kB hard limit
+          alert("File is too large – please keep it under 200 KB.");
+          return;
+        }
+        const text = await file.text();
+        endpoint = "/summarise-text";
+        payload  = { text, model: modelSelect.value };
+      } else {
+        endpoint = "/summarise";
+        payload  = { url: urlVal, model: modelSelect.value };
+      }
+
+      try {
+        showSpinner(true);
+        const res = await fetch(API_BASE + endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(`API error ${res.status}`);
+        const { summary } = await res.json();
+        resultBox.textContent = summary;
+        resultHdr.classList.remove("d-none");
+      } catch (err) {
+        console.error(err);
+        alert("Sorry – something went wrong. Check the browser console.");
+      } finally {
+        showSpinner(false);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -5,10 +5,11 @@ bedrock = boto3.client("bedrock-runtime")
 
 # ── model mapping ───────────────────────────────────────────────
 MODELS = {
-    "haiku": "anthropic.claude-3-haiku-20240307-v1:0",
     "titan": "amazon.titan-text-lite-v1"
+    "haiku": "anthropic.claude-3-haiku-20240307-v1:0",
+    
 }
-DEFAULT_MODEL = MODELS["haiku"]            # <- default
+DEFAULT_MODEL = MODELS["titan"]            # <- default
 
 # ── helpers ------------------------------------------------------
 def _invoke_bedrock(prompt: str, model_id: str) -> str:
@@ -22,9 +23,9 @@ def _invoke_bedrock(prompt: str, model_id: str) -> str:
 def _summarise_chunk(text: str, model: str) -> str:
     prompt = (
         "You are a helpful assistant.\n"
-        "Summarize the following passage in exactly five short bullet points.\n"
+        "Summarize the following passage in exactly short concise straightforward bullet points in simple words.\n"
         "Each point should describe a key event or idea.\n"
-        "Only return five bullets. Do not continue the story.\n\n"
+        "Only return less than five bullets. Do not continue the story.\n\n"
         f"{text}"
     )
     return _invoke_bedrock(prompt, model)
