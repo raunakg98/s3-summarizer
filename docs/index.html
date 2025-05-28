@@ -6,18 +6,12 @@
   <title>S3 Summariser Demo</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <style>
-    :root {
-      --primary:#2d3748;
-      --light:#f9f9f9;
-      --code-bg:#edf2f7;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--light);font-family:'Inter',sans-serif;color:#333}
+    :root{--primary:#2d3748;--light:#f9f9f9;--code:#edf2f7}
+    *{box-sizing:border-box}body{margin:0;background:var(--light);font-family:Inter,Arial,sans-serif;color:#333}
     header{background:var(--primary);color:#fff;padding:2rem 1rem;text-align:center}
     main{max-width:800px;margin:2rem auto;padding:0 1rem}
-    h2{color:var(--primary)}
-    section{margin-bottom:2.5rem}
-    code{background:var(--code-bg);display:block;padding:.5rem;border-radius:4px;white-space:pre-wrap}
+    h2{color:var(--primary)}section{margin-bottom:2.5rem}
+    code{background:var(--code);display:block;padding:.5rem;border-radius:4px;white-space:pre-wrap}
     button{background:var(--primary);color:#fff;border:none;border-radius:4px;padding:.5rem 1rem;cursor:pointer;margin-top:.5rem}
     button:hover{background:#1a202c}
     #summary{background:#fff;border:1px solid #ddd;border-radius:4px;padding:1rem;white-space:pre-wrap;margin-top:1rem}
@@ -27,8 +21,9 @@
 <body>
   <header>
     <h1>S3 Summariser</h1>
-    <p>Upload a text file and get a five-bullet summary using AWS Lambda &amp; Bedrock.</p>
+    <p>Upload a text file and get a five-bullet summary via AWS Lambda + Bedrock.</p>
   </header>
+
   <main>
     <section>
       <h2>1. Upload a <code>.txt</code> file</h2>
@@ -39,22 +34,20 @@
     </section>
 
     <section>
-      <h2>2. API endpoint (curl)</h2>
-      <p>You can also call the API directly with a public URL:</p>
-      <code>
-POST https://https://obccuc1q2c.execute-api.us-east-1.amazonaws.com/summarise
+      <h2>2. Direct API call</h2>
+      <p>POST the raw text to the endpoint:</p>
+      <code>POST https://wdz6s6z6vi.execute-api.us-east-1.amazonaws.com/summarise-text
 {
-  "url":"https://www.gutenberg.org/cache/epub/11/pg11.txt"
-}
-      </code>
+  "text": "Any long text you want summarised…"
+}</code>
     </section>
 
     <section>
       <h2>How it works</h2>
       <ul>
-        <li>The page reads your file in the browser.</li>
-        <li>It sends the raw text to an API Gateway endpoint (<code>/summarise-text</code>).</li>
-        <li>A single Lambda function calls Amazon Bedrock&nbsp;(Titan) to create a five-point summary.</li>
+        <li>The browser reads your file locally.</li>
+        <li>It sends the text to <code>/summarise-text</code> on API Gateway.</li>
+        <li>Lambda calls Amazon Bedrock (Titan) to generate exactly five bullet points.</li>
         <li>The summary is returned instantly and shown below.</li>
       </ul>
     </section>
@@ -64,45 +57,56 @@ POST https://https://obccuc1q2c.execute-api.us-east-1.amazonaws.com/summarise
       <ul>
         <li>AWS Lambda (Python 3.12)</li>
         <li>Amazon Bedrock – Titan Text G1 Lite</li>
-        <li>Amazon API Gateway HTTP API</li>
-        <li>Static site hosted on GitHub Pages</li>
+        <li>Amazon API Gateway HTTP API (with CORS)</li>
+        <li>Static page hosted on GitHub Pages</li>
       </ul>
     </section>
   </main>
+
   <footer>
-    © 2025 Raunak Ghawghawe &nbsp;|&nbsp; <a href="https://github.com/raunakghawghawe/s3-summariser" target="_blank">GitHub Repo</a>
+    © 2025 Raunak Ghawghawe •
+    <a href="https://github.com/raunakghawghawe/s3-summariser" target="_blank">GitHub Repo</a>
   </footer>
 
   <script>
-    const API_URL = 'https://obccuc1q2c.execute-api.us-east-1.amazonaws.com/summarise-text'; // replace
+    // final endpoint
+    const API_URL = 'https://wdz6s6z6vi.execute-api.us-east-1.amazonaws.com/summarise-text';
 
     async function handleUpload(){
-      const fileInput=document.getElementById('fileInput');
-      const status=document.getElementById('status');
-      const summaryBox=document.getElementById('summary');
-      summaryBox.style.display='none';
+      const fileInput = document.getElementById('fileInput');
+      const status    = document.getElementById('status');
+      const summary   = document.getElementById('summary');
+      summary.style.display = 'none';
 
-      if(!fileInput.files.length){status.textContent='Please choose a file.';return;}
-      const file=fileInput.files[0];
-      if(file.type!=="text/plain"){status.textContent='Only .txt files are supported.';return;}
+      if (!fileInput.files.length){
+        status.textContent = 'Please choose a file.'; return;
+      }
+      const file = fileInput.files[0];
+      if (file.type !== 'text/plain'){
+        status.textContent = 'Only .txt files are supported.'; return;
+      }
 
-      status.textContent='Reading file…';
-      const text=await file.text();
+      status.textContent = 'Reading file…';
+      const text = await file.text();
 
-      status.textContent='Calling summariser…';
+      status.textContent = 'Generating summary…';
       try{
-        const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
-        const data=await res.json();
+        const res = await fetch(API_URL,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({text})
+        });
+        const data = await res.json();
         if(res.ok){
-          summaryBox.textContent=data.summary||data.body||'No summary returned.';
-          summaryBox.style.display='block';
-          status.textContent='Done!';
+          summary.textContent = data.summary || 'No summary returned.';
+          summary.style.display = 'block';
+          status.textContent = 'Done!';
         }else{
           throw new Error(data.message||'Error');
         }
       }catch(err){
         console.error(err);
-        status.textContent='Failed: '+err.message;
+        status.textContent = 'Failed: '+err.message;
       }
     }
   </script>
