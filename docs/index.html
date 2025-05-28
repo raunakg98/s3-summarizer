@@ -3,110 +3,131 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>S3 Summariser Demo</title>
+  <title>Serverless Text Summariser</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <style>
     :root{--primary:#2d3748;--light:#f9f9f9;--code:#edf2f7}
-    *{box-sizing:border-box}body{margin:0;background:var(--light);font-family:Inter,Arial,sans-serif;color:#333}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--light);font-family:Inter,Arial,sans-serif;color:#333}
     header{background:var(--primary);color:#fff;padding:2rem 1rem;text-align:center}
     main{max-width:800px;margin:2rem auto;padding:0 1rem}
     h2{color:var(--primary)}section{margin-bottom:2.5rem}
     code{background:var(--code);display:block;padding:.5rem;border-radius:4px;white-space:pre-wrap}
-    button{background:var(--primary);color:#fff;border:none;border-radius:4px;padding:.5rem 1rem;cursor:pointer;margin-top:.5rem}
+    button{background:var(--primary);color:#fff;border:none;border-radius:4px;padding:.6rem 1.2rem;cursor:pointer;margin-top:.7rem}
     button:hover{background:#1a202c}
+    input[type=text],select{width:100%;max-width:420px;padding:.45rem;border:1px solid #ccc;border-radius:4px;margin-top:.4rem}
     #summary{background:#fff;border:1px solid #ddd;border-radius:4px;padding:1rem;white-space:pre-wrap;margin-top:1rem}
     footer{text-align:center;padding:1rem;color:#999}
   </style>
 </head>
 <body>
   <header>
-    <h1>S3 Summariser</h1>
-    <p>Upload a text file and get a five-bullet summary via AWS Lambda + Bedrock.</p>
+    <h1>Serverless Text Summariser</h1>
+    <p>Upload a text file or paste a URL and choose a model (Haiku or Titan).</p>
   </header>
 
   <main>
     <section>
-      <h2>1. Upload a <code>.txt</code> file</h2>
-      <input type="file" id="fileInput" accept=".txt" />
-      <button onclick="handleUpload()">Summarise</button>
+      <h2>1. Provide input</h2>
+      <label>Upload <code>.txt</code> file:</label><br/>
+      <input type="file" id="fileInput" accept=".txt" /><br/>
+
+      <p style="margin-top:1rem">or paste a text-file URL:</p>
+      <input type="text" id="urlInput" placeholder="https://example.com/file.txt" />
+
+      <p style="margin-top:1rem">Model:</p>
+      <select id="modelSelect">
+        <option value="haiku" selected>Claude 3 Haiku (default)</option>
+        <option value="titan">Titan Text Lite</option>
+      </select><br/>
+
+      <button onclick="handleSummarise()">Summarise</button>
       <p id="status"></p>
       <div id="summary" style="display:none"></div>
     </section>
 
     <section>
-      <h2>2. Direct API call</h2>
-      <p>POST the raw text to the endpoint:</p>
+      <h2>API reference</h2>
+      <p><b>POST /summarise</b> (URL payload)</p>
+      <code>POST https://wdz6s6z6vi.execute-api.us-east-1.amazonaws.com/summarise
+{
+  "url": "https://www.gutenberg.org/cache/epub/11/pg11.txt",
+  "model": "haiku"
+}</code>
+
+      <p><b>POST /summarise-text</b> (raw text payload)</p>
       <code>POST https://wdz6s6z6vi.execute-api.us-east-1.amazonaws.com/summarise-text
 {
-  "text": "Any long text you want summarised…"
+  "text": "Your long text…",
+  "model": "titan"
 }</code>
     </section>
 
     <section>
       <h2>How it works</h2>
       <ul>
-        <li>The browser reads your file locally.</li>
-        <li>It sends the text to <code>/summarise-text</code> on API Gateway.</li>
-        <li>Lambda calls Amazon Bedrock (Titan) to generate exactly five bullet points.</li>
-        <li>The summary is returned instantly and shown below.</li>
-      </ul>
-    </section>
-
-    <section>
-      <h2>Tech stack</h2>
-      <ul>
-        <li>AWS Lambda (Python 3.12)</li>
-        <li>Amazon Bedrock – Titan Text G1 Lite</li>
-        <li>Amazon API Gateway HTTP API (with CORS)</li>
-        <li>Static page hosted on GitHub Pages</li>
+        <li>Browser reads your file (or fetches the URL).</li>
+        <li>Sends it to API Gateway.</li>
+        <li>Lambda calls the selected Bedrock model to create five bullet points.</li>
+        <li>The summary returns and appears below.</li>
       </ul>
     </section>
   </main>
 
   <footer>
-    © 2025 Raunak Ghawghawe •
+    © 2025 Raunak Ghawghawe | 
     <a href="https://github.com/raunakghawghawe/s3-summariser" target="_blank">GitHub Repo</a>
   </footer>
 
   <script>
-    // final endpoint
-    const API_URL = 'https://wdz6s6z6vi.execute-api.us-east-1.amazonaws.com/summarise-text';
+    const API_BASE = 'https://wdz6s6z6vi.execute-api.us-east-1.amazonaws.com';   // e.g. https://wdz6s6z6vi.execute-api.us-east-1.amazonaws.com
 
-    async function handleUpload(){
+    async function handleSummarise(){
       const fileInput = document.getElementById('fileInput');
-      const status    = document.getElementById('status');
-      const summary   = document.getElementById('summary');
-      summary.style.display = 'none';
+      const urlInput  = document.getElementById('urlInput');
+      const modelKey  = document.getElementById('modelSelect').value;
+      const statusEl  = document.getElementById('status');
+      const summaryEl = document.getElementById('summary');
+      summaryEl.style.display='none';
+      summaryEl.textContent='';
 
-      if (!fileInput.files.length){
-        status.textContent = 'Please choose a file.'; return;
+      let payload={}, endpoint='';
+      if (fileInput.files.length){                          // File path
+        const file=fileInput.files[0];
+        if(file.type!=='text/plain'){statusEl.textContent='Only .txt files supported.';return;}
+        statusEl.textContent='Reading file…';
+        payload.text = await file.text();
+        endpoint = API_BASE + '/summarise-text';
+      } else if (urlInput.value.trim()){                    // URL path
+        payload.url = urlInput.value.trim();
+        endpoint = API_BASE + '/summarise';
+      } else {
+        statusEl.textContent='Choose a file or enter a URL.'; return;
       }
-      const file = fileInput.files[0];
-      if (file.type !== 'text/plain'){
-        status.textContent = 'Only .txt files are supported.'; return;
-      }
+      payload.model = modelKey;
 
-      status.textContent = 'Reading file…';
-      const text = await file.text();
-
-      status.textContent = 'Generating summary…'; 
+      statusEl.textContent='Generating summary…';
       try{
-        const res = await fetch(API_URL,{
+        const res  = await fetch(endpoint,{
           method:'POST',
           headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({text})
+          body:JSON.stringify(payload)
         });
-        const data = await res.json();
+
+        const raw  = await res.text();           // read raw body
+        let   data = {};
+        try { data = JSON.parse(raw); } catch { /* fallback */ }
+
         if(res.ok){
-          summary.textContent = data.summary || 'No summary returned.';
-          summary.style.display = 'block';
-          status.textContent = 'Done!';
+          summaryEl.textContent = (data.summary || data.body || raw || '').trim() || 'No summary returned.';
+          summaryEl.style.display='block';
+          statusEl.textContent  = 'Done!';
         }else{
-          throw new Error(data.message||'Error');
+          throw new Error(`${res.status} ${res.statusText}: ${raw}`);
         }
       }catch(err){
         console.error(err);
-        status.textContent = 'Failed: '+err.message;
+        statusEl.textContent = 'Failed: ' + err.message;
       }
     }
   </script>
