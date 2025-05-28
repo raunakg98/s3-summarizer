@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Five-Bullet Summariser (S3 + URL)
+Description: Five-Bullet Summariser (S3 + URL + File-Upload)
 
 Globals:
   Function:
@@ -9,32 +9,42 @@ Globals:
     Timeout: 30
     Environment:
       Variables:
-        MODEL_ID: amazon.titan-text-lite-v1 # <─ titan text lite model ID
+        MODEL_ID: amazon.titan-text-lite-v1
 
+# ───────────────────────── Resources ─────────────────────────
 Resources:
 
+  ## 1. HTTP API with CORS
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: ['*']
+        AllowMethods: [POST, OPTIONS]
+        AllowHeaders: [Content-Type]
+
+  ## 2. S3 bucket for raw + summary files
   Bucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub "${AWS::StackName}-data"
 
+  ## 3. Lambda that does summarisation
   Summariser:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: src/handler.lambda_handler          # <─ our code path
+      Handler: src/handler.lambda_handler
       Policies:
-        - AWSLambdaBasicExecutionRole             # write CloudWatch Logs
-        - Statement:                              # generic S3 access
+        - AWSLambdaBasicExecutionRole
+        - Statement:
             - Effect: Allow
-              Action:
-                - s3:GetObject
-                - s3:PutObject
+              Action: [s3:GetObject, s3:PutObject]
               Resource: "arn:aws:s3:::*/*"
-            - Effect: Allow                       # Bedrock call
+            - Effect: Allow
               Action: bedrock:InvokeModel
               Resource: "*"
       Events:
-        ## 1. S3 trigger (raw/ prefix)
+        # A. S3 trigger for files placed in raw/
         S3Upload:
           Type: S3
           Properties:
@@ -45,17 +55,31 @@ Resources:
                 Rules:
                   - Name: prefix
                     Value: raw/
-        ## 2. Public HTTP POST /summarise
-        Api:
+        # B. POST /summarise (optional URL-based)
+        SummariseUrl:
           Type: HttpApi
           Properties:
-            Path:   /summarise
+            ApiId: !Ref HttpApi
+            Path: /summarise
+            Method: post
+        # C. POST /summarise-text  (used by HTML page)
+        SummariseText:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /summarise-text
             Method: post
 
+# ───────────────────────── Outputs ───────────────────────────
 Outputs:
   BucketName:
-    Description: S3 bucket to upload your .txt files (use the raw/ prefix)
+    Description: S3 bucket for uploads (use raw/ prefix)
     Value: !Ref Bucket
-  ApiUrl:
-    Description: Invoke URL for POST /summarise
-    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+
+  ApiBaseUrl:
+    Description: Base invoke URL for the HTTP API
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+
+  SummariseTextUrl:
+    Description: Convenience URL for POST /summarise-text
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/summarise-text"
